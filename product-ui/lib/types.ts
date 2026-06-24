@@ -5,6 +5,8 @@ export type HealthItem = {
   command?: string;
   available: boolean;
   detail?: string;
+  required?: boolean;
+  category?: string;
 };
 
 export type HealthResponse = {

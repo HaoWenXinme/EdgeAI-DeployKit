@@ -10,6 +10,8 @@ class HealthItem(BaseModel):
     command: str | None = None
     available: bool
     detail: str | None = None
+    required: bool = True
+    category: str = "core"
 
 
 class HealthResponse(BaseModel):

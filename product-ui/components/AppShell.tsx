@@ -141,8 +141,10 @@ export function AppShell({
 }) {
   useSmoothWheelScroll();
 
-  const available = health.checks.filter((item) => item.available).length;
-  const total = Math.max(health.checks.length, 1);
+  const requiredChecks = health.checks.filter((item) => item.required !== false);
+  const scoreChecks = requiredChecks.length ? requiredChecks : health.checks;
+  const available = scoreChecks.filter((item) => item.available).length;
+  const total = Math.max(scoreChecks.length, 1);
   const ratio = Math.round((available / total) * 100);
 
   return (

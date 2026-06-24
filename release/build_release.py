@@ -217,6 +217,13 @@ task-aware local inference flow, and report generation code.
 
 ### Windows
 
+Prerequisites:
+
+- Windows 10/11 x86_64
+- Python 3.10-3.12 on PATH
+- Node.js 20+ with Corepack, or a global `pnpm`
+- Network access to Python/npm package indexes on first start
+
 Double-click:
 
 ```text
@@ -282,6 +289,36 @@ in separate terminals.
 """,
         encoding="utf-8",
     )
+    if target.startswith("windows"):
+        (stage / "WINDOWS_QUICK_START_先看我.txt").write_text(
+            """EdgeAI-DeployKit Windows 快速说明
+
+这个 zip 是轻量启动包，不内置完整 Python/Node 环境。
+第一次启动会自动创建 .venv 并安装依赖，但电脑上必须先有：
+
+1. Windows 10/11 x86_64
+2. Python 3.10/3.11/3.12，安装时勾选 Add python.exe to PATH
+3. Node.js 20 LTS 或更高版本，安装后自带 corepack
+4. 能访问 pip/npm 下载源的网络
+
+使用方法：
+
+1. 解压整个文件夹，不要只双击压缩包里的文件
+2. 双击 start-windows.bat
+3. 第一次启动会下载并安装依赖，时间可能较长
+4. 浏览器打开 http://127.0.0.1:3000/workspace
+5. 结束时双击 stop-windows.bat
+
+如果提示没有环境：
+
+- 没有 Python：安装 Python 3.10-3.12 后重新运行 start-windows.bat
+- 没有 Node.js/corepack：安装 Node.js 20 LTS 后重新运行 start-windows.bat
+- Runtime 页面显示 PyTorch/TensorFlow/LLM/Board 为 Optional：这不是启动失败，只表示这些模型类型或板端流程的可选依赖尚未安装
+
+当前轻量包适合有基础运行环境的电脑。完全离线、真正解压即用的版本需要单独发布 portable/full 包，体积会大很多。
+""",
+            encoding="utf-8",
+        )
 
 
 def stage_target(target: str, clean: bool) -> Path:

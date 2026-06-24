@@ -5,11 +5,13 @@ export const fallbackHealth: HealthResponse = {
   outputs_dir: 'outputs',
   reports_dir: 'reports',
   checks: [
-    { name: 'edgeai CLI', command: 'edgeai', available: false, detail: 'waiting for backend' },
-    { name: 'cmake', command: 'cmake', available: false },
-    { name: 'gcc', command: 'gcc', available: false },
-    { name: 'qemu-system-aarch64', command: 'qemu-system-aarch64', available: false },
-    { name: 'atc', command: 'atc', available: false },
+    { name: 'Python runtime', command: 'python', available: false, detail: 'waiting for backend', required: true, category: 'core' },
+    { name: 'edgeai module', command: 'python -m edgeai.cli', available: false, detail: 'waiting for backend', required: true, category: 'core' },
+    { name: 'Node.js', command: 'node', available: false, required: true, category: 'core' },
+    { name: 'cmake', command: 'cmake', available: false, required: false, category: 'native-build' },
+    { name: 'gcc', command: 'gcc', available: false, required: false, category: 'native-build' },
+    { name: 'qemu-system-aarch64', command: 'qemu-system-aarch64', available: false, required: false, category: 'board' },
+    { name: 'atc', command: 'atc', available: false, required: false, category: 'board' },
   ],
 };
 

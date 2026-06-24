@@ -2,6 +2,8 @@ type CheckItem = {
   name: string;
   path: string;
   ok: boolean;
+  required: boolean;
+  category: string;
 };
 
 type HealthLike = {
@@ -12,29 +14,31 @@ type HealthLike = {
 };
 
 const fallbackChecks: CheckItem[] = [
-  { name: "edgeai CLI", path: "/root/edge-ai-deploy-kit/.venv/bin/edgeai", ok: true },
-  { name: "Python", path: "/root/edge-ai-deploy-kit/.venv/bin/python3", ok: true },
-  { name: "cmake", path: "/usr/bin/cmake", ok: true },
-  { name: "make", path: "/usr/bin/make", ok: true },
-  { name: "gcc", path: "/usr/bin/gcc", ok: true },
-  { name: "g++", path: "/usr/bin/g++", ok: true },
-  { name: "qemu-system-aarch64", path: "/usr/local/bin/qemu-system-aarch64", ok: true },
-  { name: "atc", path: "atc", ok: false },
-  { name: "docker", path: "/usr/bin/docker", ok: true },
+  { name: "edgeai CLI", path: "/root/edge-ai-deploy-kit/.venv/bin/edgeai", ok: true, required: true, category: "core" },
+  { name: "Python", path: "/root/edge-ai-deploy-kit/.venv/bin/python3", ok: true, required: true, category: "core" },
+  { name: "cmake", path: "/usr/bin/cmake", ok: true, required: false, category: "native-build" },
+  { name: "make", path: "/usr/bin/make", ok: true, required: false, category: "native-build" },
+  { name: "gcc", path: "/usr/bin/gcc", ok: true, required: false, category: "native-build" },
+  { name: "g++", path: "/usr/bin/g++", ok: true, required: false, category: "native-build" },
+  { name: "qemu-system-aarch64", path: "/usr/local/bin/qemu-system-aarch64", ok: true, required: false, category: "board" },
+  { name: "atc", path: "atc", ok: false, required: false, category: "board" },
+  { name: "docker", path: "/usr/bin/docker", ok: true, required: false, category: "board" },
   {
     name: "openEuler aarch64 SDK",
     path: "/opt/openeuler-aarch64/environment-setup-aarch64-openeuler-linux",
     ok: false,
+    required: false,
+    category: "board",
   },
 ];
 
 function valueToCheck(name: string, value: unknown): CheckItem {
   if (typeof value === "boolean") {
-    return { name, path: name, ok: value };
+    return { name, path: name, ok: value, required: true, category: "core" };
   }
 
   if (typeof value === "string") {
-    return { name, path: value, ok: Boolean(value) };
+    return { name, path: value, ok: Boolean(value), required: true, category: "core" };
   }
 
   if (value && typeof value === "object") {
@@ -47,6 +51,8 @@ function valueToCheck(name: string, value: unknown): CheckItem {
       ok?: boolean;
       available?: boolean;
       status?: string;
+      required?: boolean;
+      category?: string;
     };
 
     const statusText = String(item.status || "").toLowerCase();
@@ -61,10 +67,12 @@ function valueToCheck(name: string, value: unknown): CheckItem {
       name: item.name || item.label || name,
       path: item.path || item.value || item.command || name,
       ok,
+      required: item.required !== false,
+      category: item.category || "core",
     };
   }
 
-  return { name, path: name, ok: false };
+  return { name, path: name, ok: false, required: true, category: "core" };
 }
 
 function normalizeChecks(health?: HealthLike): CheckItem[] {
@@ -91,8 +99,10 @@ function scoreText(health?: HealthLike, checks?: CheckItem[]) {
   }
 
   if (checks?.length) {
-    const passed = checks.filter((item) => item.ok).length;
-    return `${passed}/${checks.length}`;
+    const required = checks.filter((item) => item.required);
+    const scoreChecks = required.length ? required : checks;
+    const passed = scoreChecks.filter((item) => item.ok).length;
+    return `${passed}/${scoreChecks.length}`;
   }
 
   return "0/0";
@@ -101,6 +111,8 @@ function scoreText(health?: HealthLike, checks?: CheckItem[]) {
 export function RuntimeChecksPanel({ health }: { health?: HealthLike }) {
   const checks = normalizeChecks(health);
   const score = scoreText(health, checks);
+  const requiredChecks = checks.filter((item) => item.required);
+  const optionalChecks = checks.filter((item) => !item.required);
 
   return (
     <section className="runtime-assets-panel">
@@ -120,12 +132,22 @@ export function RuntimeChecksPanel({ health }: { health?: HealthLike }) {
           <span>Status</span>
         </div>
 
-        {checks.map((item) => (
+        {requiredChecks.map((item) => (
           <div key={`${item.name}-${item.path}`} className="runtime-assets-row">
             <span>{item.name}</span>
             <code>{item.path}</code>
             <em className={item.ok ? "runtime-status-ok" : "runtime-status-missing"}>
               {item.ok ? "Ready" : "Missing"}
+            </em>
+          </div>
+        ))}
+
+        {optionalChecks.map((item) => (
+          <div key={`${item.name}-${item.path}`} className="runtime-assets-row">
+            <span>{item.name}</span>
+            <code>{item.path}</code>
+            <em className={item.ok ? "runtime-status-ok" : "runtime-status-missing"}>
+              {item.ok ? "Ready" : `Optional / ${item.category}`}
             </em>
           </div>
         ))}
