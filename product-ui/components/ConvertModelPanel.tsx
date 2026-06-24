@@ -477,7 +477,7 @@ export function ConvertModelPanel({ onRefresh }: ConvertModelPanelProps) {
 
             <div className="flex flex-wrap justify-end gap-2">
               <button type="button" onClick={() => setRequirements(null)} className="rounded-xl border border-line bg-black/30 px-3 py-2 text-xs text-ink">取消</button>
-              <button type="button" onClick={confirmModalAndConvert} disabled={busy || Boolean(requirements?.install_commands?.length)} className="rounded-xl border border-cyan/30 bg-cyan/10 px-3 py-2 text-xs font-semibold text-cyan">
+              <button type="button" onClick={confirmModalAndConvert} disabled={busy} className="rounded-xl border border-cyan/30 bg-cyan/10 px-3 py-2 text-xs font-semibold text-cyan">
                 补齐参数并开始转换
               </button>
             </div>

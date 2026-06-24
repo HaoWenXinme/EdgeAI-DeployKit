@@ -215,6 +215,45 @@ def import_ok(module: str) -> bool:
         return False
 
 
+def _auto_install_conversion_deps(requirements: dict[str, Any], package_dir: Path, warnings: list[str]) -> bool:
+    framework = str(requirements.get("framework") or "").lower()
+    if not requirements.get("install_commands"):
+        return False
+
+    install_plan: list[list[str]] = []
+    if framework in {"pytorch", "torchscript"}:
+        install_plan.append(["--index-url", os.environ.get("PYTORCH_INDEX_URL", "https://download.pytorch.org/whl/cpu"), "torch", "torchvision"])
+    elif framework == "tensorflow":
+        install_plan.append(["tensorflow-cpu", "tf2onnx", "h5py"])
+    elif framework == "sklearn":
+        install_plan.append(["joblib", "skl2onnx"])
+    elif framework == "xgboost":
+        install_plan.append(["onnxmltools", "xgboost"])
+    elif framework == "lightgbm":
+        install_plan.append(["onnxmltools", "lightgbm"])
+    elif framework == "llm":
+        install_plan.append(["llama-cpp-python"])
+    else:
+        return False
+
+    log_path = package_dir / "dependency_install.log"
+    with log_path.open("a", encoding="utf-8", errors="ignore") as log:
+        for args in install_plan:
+            cmd = [sys.executable, "-m", "pip", "install", *args]
+            log.write("$ " + " ".join(cmd) + "\n")
+            log.flush()
+            code, text = run(cmd)
+            log.write(text + "\n")
+            log.flush()
+            if code != 0:
+                raise RuntimeError(
+                    "automatic dependency installation failed; see "
+                    f"{log_path}. Last output:\n{text[-4000:]}"
+                )
+    warnings.append(f"Auto-installed missing conversion dependencies for {framework}; log: {log_path}")
+    return True
+
+
 def _safe_torch_load(path: Path, device: Any) -> Any:
     import torch  # type: ignore
 
@@ -978,22 +1017,8 @@ def convert_model(
         requirements = inspect_conversion_requirements(**params)
         (package_dir / "convert_requirements.json").write_text(json.dumps(requirements, indent=2, ensure_ascii=False), encoding="utf-8")
         if requirements.get("install_commands"):
-            payload = {
-                "ok": False,
-                "requires_input": False,
-                "framework": requirements.get("framework", resolved_framework),
-                "source_model": str(source),
-                "package_name": package,
-                "package_dir": str(package_dir),
-                "output_onnx": str(output_onnx),
-                "opset": opset,
-                "message": "conversion dependencies are missing",
-                "install_commands": requirements.get("install_commands", []),
-                "missing_params": requirements.get("missing_params", []),
-                "suggested_params": requirements.get("suggested_params", {}),
-                "questions": requirements.get("questions", []),
-            }
-            raise ConversionNeedsInput(payload)
+            if _auto_install_conversion_deps(requirements, package_dir, warnings):
+                continue
         if not requirements.get("missing_params"):
             break
         allow_prompt = sys.stdin.isatty() if interactive is None else bool(interactive)
