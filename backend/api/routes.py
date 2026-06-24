@@ -1383,11 +1383,14 @@ def local_inference_flow(payload: dict):
     package_dir = project_root / "outputs" / "packages" / package_name
     if not package_dir.exists():
         raise HTTPException(status_code=404, detail=f"package not found: outputs/packages/{package_name}")
-    if not (package_dir / "model.onnx").exists():
+    from edgeai.llm_runner import is_llm_package
+    is_llm = is_llm_package(package_dir)
+    if not is_llm and not (package_dir / "model.onnx").exists():
         raise HTTPException(status_code=404, detail=f"model.onnx not found in package: outputs/packages/{package_name}")
 
     input_value = payload.get("input") or payload.get("input_path")
-    input_path = resolve_project_file(input_value) if input_value else None
+    llm_prompt = str(payload.get("prompt") or input_value or "").strip() if is_llm else None
+    input_path = None if is_llm else (resolve_project_file(input_value) if input_value else None)
     stages: list[dict] = []
 
     def append_or_fail(stage: str, command: list[str]):
@@ -1403,7 +1406,9 @@ def local_inference_flow(payload: dict):
         return bool(result.get("ok"))
 
     # Keep package self-healing: if user only converted model, generate analysis/task config automatically.
-    if payload.get("force_analyze") or not (package_dir / "model_signature.json").exists() or not (package_dir / "operator_report.json").exists():
+    if is_llm:
+        stages.append({"stage": "analyze", "ok": True, "skipped": True, "output": "LLM package uses runtime metadata instead of ONNX graph analysis"})
+    elif payload.get("force_analyze") or not (package_dir / "model_signature.json").exists() or not (package_dir / "operator_report.json").exists():
         if not append_or_fail("analyze", edgeai_cmd("analyze", "--package", str(package_dir))):
             return {"ok": False, "message": "Analyze failed", "package_name": package_name, "package_dir": str(package_dir), "input": input_path, "stages": stages}
     else:
@@ -1415,7 +1420,12 @@ def local_inference_flow(payload: dict):
     else:
         stages.append({"stage": "task-init", "ok": True, "skipped": True, "output": "model_task.json already exists"})
 
-    if input_path:
+    if is_llm:
+        if not llm_prompt:
+            return {"ok": False, "message": "No prompt provided for LLM package", "package_name": package_name, "package_dir": str(package_dir), "input": None, "stages": stages}
+        (package_dir / "input.txt").write_text(llm_prompt + "\n", encoding="utf-8")
+        stages.append({"stage": "prepare-input", "ok": True, "skipped": False, "output": "prompt saved to input.txt"})
+    elif input_path:
         from edgeai.preprocess import prepare_package_input
 
         if not append_python_or_fail("prepare-input", prepare_package_input, package_dir, Path(input_path)):
@@ -1427,7 +1437,7 @@ def local_inference_flow(payload: dict):
 
     from edgeai.local_runner import run_local_package
 
-    if not append_python_or_fail("local-run", run_local_package, package_dir):
+    if not append_python_or_fail("local-run", run_local_package, package_dir, prompt=llm_prompt):
         return {"ok": False, "message": "Local run failed", "package_name": package_name, "package_dir": str(package_dir), "input": input_path, "stages": stages}
 
     # Task render is optional in older installs, but this project should have it. Fail clearly if it breaks.
@@ -1443,11 +1453,14 @@ def local_inference_flow(payload: dict):
 
     artifacts = {
         "model.onnx": (package_dir / "model.onnx").exists(),
+        "model.gguf": (package_dir / "model.gguf").exists(),
         "model_signature.json": (package_dir / "model_signature.json").exists(),
         "model_task.json": (package_dir / "model_task.json").exists(),
         "input.npy": (package_dir / "input.npy").exists(),
+        "input.txt": (package_dir / "input.txt").exists(),
         "preprocess.json": (package_dir / "preprocess.json").exists(),
         "local_output.npy": (package_dir / "local_output.npy").exists(),
+        "local_output.txt": (package_dir / "local_output.txt").exists(),
         "local_result.json": (package_dir / "local_result.json").exists(),
         "task_result.json": (package_dir / "task_result.json").exists(),
         "report.md": (package_dir / "report.md").exists(),
@@ -1462,7 +1475,7 @@ def local_inference_flow(payload: dict):
         except Exception:
             task_result = None
 
-    required_artifacts = ["input.npy", "preprocess.json", "local_output.npy", "local_result.json", "task_result.json", "report.md", "report.pdf"]
+    required_artifacts = ["input.txt", "local_output.txt", "local_result.json", "task_result.json", "report.md", "report.pdf"] if is_llm else ["input.npy", "preprocess.json", "local_output.npy", "local_result.json", "task_result.json", "report.md", "report.pdf"]
     missing_artifacts = [name for name in required_artifacts if not artifacts.get(name)]
     if missing_artifacts:
         return {

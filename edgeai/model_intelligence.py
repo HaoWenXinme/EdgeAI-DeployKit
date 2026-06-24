@@ -307,7 +307,17 @@ def probe_model(source_model: str | Path, framework: str = "auto") -> dict[str, 
                 result["suggested_params"]["preprocess_profile"] = best.get("preprocess_profile")
         return result
 
-    if suffix in {".h5", ".keras", ".pb"} or source.is_dir():
+    if source.is_dir() and (source / "config.json").exists() and (
+        (source / "tokenizer.json").exists()
+        or (source / "tokenizer.model").exists()
+        or list(source.glob("*.safetensors"))
+        or list(source.glob("*.gguf"))
+    ):
+        result.update({"detected_kind": "llm_directory", "framework": "llm"})
+        result["suggested_params"].update({"framework": "llm", "task_type": "llm_chat"})
+        return result
+
+    if suffix in {".h5", ".hdf5", ".keras", ".pb", ".tflite"} or source.is_dir():
         result.update({"detected_kind": "tensorflow_or_keras", "framework": "tensorflow"})
         result["suggested_params"].update({"framework": "tensorflow"})
         return result

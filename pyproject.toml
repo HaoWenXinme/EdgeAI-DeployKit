@@ -25,7 +25,9 @@ webui = ["streamlit", "pandas"]
 pdf   = ["weasyprint", "reportlab"]
 pytorch = ["torch", "torchvision"]
 tensorflow = ["tensorflow-cpu", "tf2onnx", "h5py"]
-full  = ["edgeai-deploykit[webui,pdf,pytorch,tensorflow]"]
+traditional-ml = ["joblib", "skl2onnx", "onnxmltools", "xgboost", "lightgbm"]
+llm = ["llama-cpp-python"]
+full  = ["edgeai-deploykit[webui,pdf,pytorch,tensorflow,traditional-ml,llm]"]
 
 [project.scripts]
 edgeai = "edgeai.cli:app"

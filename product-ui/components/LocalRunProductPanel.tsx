@@ -26,7 +26,7 @@ type ActiveLocalSession = {
 };
 
 function cleanName(value: string | undefined) {
-  const raw = (value || "user_model").replace(/\.onnx$/i, "");
+  const raw = (value || "user_model").replace(/\.(onnx|pt|pth|ckpt|h5|hdf5|keras|pb|tflite|pkl|joblib|sav|bst|xgb|lgb|gguf|zip)$/i, "");
   const cleaned = raw.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
   return cleaned || "user_model";
 }
@@ -37,7 +37,7 @@ function basenameWithoutExt(path?: string) {
   const parts = clean.split("/").filter(Boolean);
   const file = parts[parts.length - 1] || "user_model";
   const parent = parts[parts.length - 2] || "user_model";
-  const stem = file.replace(/\.onnx$/i, "").replace(/\.(pt|pth|h5|keras|pb)$/i, "");
+  const stem = file.replace(/\.(onnx|pt|pth|ckpt|h5|hdf5|keras|pb|tflite|pkl|joblib|sav|bst|xgb|lgb|gguf|zip)$/i, "");
 
   // Zoo models are usually stored as .../<model_name>/model.onnx.
   // Using the parent avoids wrong package names such as model_local.
@@ -232,7 +232,7 @@ export function LocalRunProductPanel({
   }
 
   async function launch(action: string, params: Record<string, string | boolean>) {
-    if (!session.modelPath.trim() && action === "init-package") {
+    if (!session.modelPath.trim() && action === "local-model-setup") {
       window.alert("请先选择、上传或填写 ONNX 模型路径");
       return;
     }
@@ -263,14 +263,14 @@ export function LocalRunProductPanel({
 
   const steps = [
     {
-      key: "init-package",
-      title: "Init Package",
+      key: "local-model-setup",
+      title: "Setup Model",
       desc: "把本次流程的 ONNX 模型整理为本地推理 package。",
       icon: UploadCloud,
       params: {
         name: safePackageName,
         source_model: session.modelPath.trim(),
-        framework: "onnx",
+        framework: "auto",
         overwrite: true,
       },
     },
@@ -325,7 +325,7 @@ export function LocalRunProductPanel({
           <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">Upload model</div>
           <input
             type="file"
-            accept=".onnx"
+            accept=".onnx,.pt,.pth,.ckpt,.h5,.hdf5,.keras,.pb,.tflite,.pkl,.joblib,.sav,.bst,.xgb,.lgb,.gguf,.txt,.json,.zip"
             onChange={(event) => setModelFile(event.target.files?.[0] || null)}
             className="mb-3 block w-full rounded-xl border border-line bg-black/30 px-3 py-2 text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-cyan/20 file:px-3 file:py-1 file:text-cyan"
           />

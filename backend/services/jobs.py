@@ -145,7 +145,10 @@ def _validate_job_artifacts(job: JobRecord, path: Path) -> str | None:
     if _contains_action(job, "local-model-setup"):
         if pkg is None:
             return None
-        missing = _missing_files(pkg, ["model.onnx", "model_signature.json", "operator_report.json", "model_task.json"])
+        is_llm = (pkg / "model.gguf").exists() or (pkg / "llm_runtime.json").exists()
+        required = ["model_signature.json", "operator_report.json", "model_task.json"]
+        required.insert(0, "model.gguf" if is_llm else "model.onnx")
+        missing = _missing_files(pkg, required)
         if missing:
             return f"local-model-setup finished but missing artifact(s) in {pkg}: {', '.join(missing)}"
         return None
@@ -154,8 +157,8 @@ def _validate_job_artifacts(job: JobRecord, path: Path) -> str | None:
     if _contains_action(job, "convert"):
         if pkg is None:
             return None
-        if not (pkg / "model.onnx").exists():
-            return f"conversion finished but model.onnx was not generated: {pkg / 'model.onnx'}"
+        if not (pkg / "model.onnx").exists() and not (pkg / "model.gguf").exists() and not (pkg / "llm_runtime.json").exists():
+            return f"conversion finished but no runnable model artifact was generated in: {pkg}"
         return None
 
     # Later pipeline steps should not be green unless their expected artifact exists.

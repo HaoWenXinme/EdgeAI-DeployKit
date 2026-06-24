@@ -50,9 +50,17 @@ def register_local_run_commands(app: typer.Typer) -> None:
         package: Path = typer.Option(..., "--package", help="Package directory"),
         repeat: int = typer.Option(1, "--repeat", "-r", help="Average latency over N runs"),
         warmup: int = typer.Option(1, "--warmup", help="Warmup runs before measurement"),
+        prompt: Optional[str] = typer.Option(None, "--prompt", help="Prompt text for llm_chat packages"),
+        max_tokens: Optional[int] = typer.Option(None, "--max-tokens", help="Max generated tokens for llm_chat packages"),
+        temperature: Optional[float] = typer.Option(None, "--temperature", help="Sampling temperature for llm_chat packages"),
     ):
         """Run package model.onnx locally with ONNX Runtime CPUExecutionProvider."""
-        _print_json(run_local_package(package, repeat=repeat, warmup=warmup))
+        if max_tokens is not None or temperature is not None:
+            from .llm_runner import is_llm_package, run_llm_package
+            if is_llm_package(package):
+                _print_json(run_llm_package(package, prompt=prompt, max_tokens=max_tokens, temperature=temperature))
+                return
+        _print_json(run_local_package(package, repeat=repeat, warmup=warmup, prompt=prompt))
 
 # ---------------------------------------------------------------------------
 # EdgeAI Local Task System commands
@@ -78,4 +86,3 @@ def task_info_cmd(
     import json as _json
     result = read_model_task(package, auto_create=auto_create)
     print(_json.dumps(result, ensure_ascii=False, indent=2))
-

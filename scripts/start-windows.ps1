@@ -5,6 +5,8 @@ param(
   [switch]$NoFrontendInstall,
   [switch]$WithPytorch,
   [switch]$WithTensorflow,
+  [switch]$WithML,
+  [switch]$WithLLM,
   [switch]$NoBrowser
 )
 
@@ -141,6 +143,20 @@ if (-not $NoInstall -and -not (Test-Path $InstallMarker)) {
     if ($LASTEXITCODE -ne 0) { throw "TensorFlow dependency install failed." }
   } else {
     Write-Host "[EdgeAI] TensorFlow conversion deps skipped. Use -WithTensorflow to enable .h5/.keras conversion."
+  }
+
+  if ($WithML) {
+    & $VenvPython -m pip install ".[traditional-ml]"
+    if ($LASTEXITCODE -ne 0) { throw "Traditional ML dependency install failed." }
+  } else {
+    Write-Host "[EdgeAI] Traditional ML deps skipped. Use -WithML to enable sklearn/xgboost/lightgbm conversion."
+  }
+
+  if ($WithLLM) {
+    & $VenvPython -m pip install ".[llm]"
+    if ($LASTEXITCODE -ne 0) { throw "LLM runtime dependency install failed." }
+  } else {
+    Write-Host "[EdgeAI] LLM runtime deps skipped. Use -WithLLM or install llama.cpp to enable GGUF chat."
   }
 
   if (-not $NoFrontendInstall) {

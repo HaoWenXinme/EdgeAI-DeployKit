@@ -187,6 +187,7 @@ backup files.
 - Local task system notes: `docs/LOCAL_TASK_SYSTEM_GUIDE.md`
 - Conversion wizard notes: `docs/CONVERT_SMART_WIZARD_GUIDE.md`
 - TensorFlow importer notes: `docs/TENSORFLOW_UNIVERSAL_IMPORTER.md`
+- Model adapter matrix: `docs/MODEL_ADAPTER_MATRIX.md`
 
 ## Development Notes
 

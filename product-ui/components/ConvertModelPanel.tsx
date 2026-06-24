@@ -7,7 +7,7 @@ type ConvertModelPanelProps = {
   onRefresh?: () => void | Promise<void>;
 };
 
-type Framework = "auto" | "onnx" | "pytorch" | "torchscript" | "tensorflow" | "sklearn" | "xgboost" | "lightgbm";
+type Framework = "auto" | "onnx" | "pytorch" | "torchscript" | "tensorflow" | "sklearn" | "xgboost" | "lightgbm" | "llm";
 
 type ParamValue = string | number | boolean | null | undefined;
 type ParamMap = Record<string, ParamValue>;
@@ -47,6 +47,7 @@ const FRAMEWORK_OPTIONS: Array<{ value: Framework; label: string }> = [
   { value: "sklearn", label: "Scikit-Learn" },
   { value: "xgboost", label: "XGBoost" },
   { value: "lightgbm", label: "LightGBM" },
+  { value: "llm", label: "LLM / GGUF" },
 ];
 
 function cleanName(value: unknown) {
@@ -57,7 +58,7 @@ function cleanName(value: unknown) {
     .filter(Boolean)
     .pop() || "user_model";
 
-  const withoutExt = raw.replace(/\.(onnx|pt|pth|ckpt|h5|keras|pb|pkl|joblib|sav|bst|xgb|lgb|txt|json)$/i, "");
+  const withoutExt = raw.replace(/\.(onnx|pt|pth|ckpt|h5|hdf5|keras|pb|tflite|pkl|joblib|sav|bst|xgb|lgb|gguf|txt|json|zip)$/i, "");
   const cleaned = withoutExt.replace(/[^A-Za-z0-9_.-]+/g, "_").replace(/^_+|_+$/g, "");
   return cleaned || "user_model";
 }
@@ -76,10 +77,11 @@ function inferFramework(pathOrName: string): Framework {
   const lower = pathOrName.toLowerCase();
   if (lower.endsWith(".onnx")) return "onnx";
   if (lower.endsWith(".pt") || lower.endsWith(".pth") || lower.endsWith(".ckpt")) return "pytorch";
-  if (lower.endsWith(".h5") || lower.endsWith(".keras") || lower.endsWith(".pb") || lower.includes("saved_model")) return "tensorflow";
+  if (lower.endsWith(".h5") || lower.endsWith(".hdf5") || lower.endsWith(".keras") || lower.endsWith(".pb") || lower.endsWith(".tflite") || lower.includes("saved_model")) return "tensorflow";
   if (lower.endsWith(".pkl") || lower.endsWith(".joblib") || lower.endsWith(".sav")) return "sklearn";
   if (lower.endsWith(".bst") || lower.endsWith(".xgb") || lower.endsWith(".json")) return "xgboost";
   if (lower.endsWith(".lgb") || lower.endsWith(".txt")) return "lightgbm";
+  if (lower.endsWith(".gguf") || lower.includes("llm") || lower.includes("chat")) return "llm";
   return "auto";
 }
 
@@ -319,7 +321,7 @@ export function ConvertModelPanel({ onRefresh }: ConvertModelPanelProps) {
           <span className="mb-2 block font-semibold text-ink">上传模型文件</span>
           <input
             type="file"
-            accept=".onnx,.pt,.pth,.ckpt,.h5,.keras,.pb,.pkl,.joblib,.sav,.bst,.xgb,.lgb,.txt,.json"
+            accept=".onnx,.pt,.pth,.ckpt,.h5,.hdf5,.keras,.pb,.tflite,.pkl,.joblib,.sav,.bst,.xgb,.lgb,.gguf,.txt,.json,.zip"
             onChange={(event) => handleUpload(event.target.files?.[0] || null)}
             disabled={busy}
             className="block w-full text-xs"

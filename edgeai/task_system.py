@@ -141,7 +141,12 @@ def create_or_update_model_task(package: str | Path, task_type: str = "auto", la
     task_path = package_dir / "model_task.json"
     signature = _read_json(signature_path)
     operator_report = _read_json(operator_path)
+    llm_runtime = _read_json(package_dir / "llm_runtime.json")
     inferred, reasons = infer_task_type_from_signature(signature, package_name)
+    if llm_runtime or (package_dir / "model.gguf").exists():
+        inferred = "llm_chat"
+        if "LLM package metadata found" not in reasons:
+            reasons.append("LLM package metadata found")
     final_task = inferred if task_type in (None, "", "auto") else task_type
     if final_task not in TASK_GUIDANCE:
         reasons.append(f"unsupported task_type={final_task}; fallback to unknown")
@@ -155,17 +160,22 @@ def create_or_update_model_task(package: str | Path, task_type: str = "auto", la
     class_count = _last_int(output_shape) if _rank(output_shape) in (1, 2) else None
     guidance = TASK_GUIDANCE.get(final_task, TASK_GUIDANCE["unknown"])
     label_map_value = str(label_map) if label_map else default_label_map(project_root, final_task, class_count)
+    runtime_name = "onnxruntime"
+    model_path_value = "model.onnx"
+    if final_task == "llm_chat":
+        runtime_name = str((llm_runtime or {}).get("runtime") or signature.get("runtime") or "llama.cpp")
+        model_path_value = str((llm_runtime or {}).get("model_path") or ("model.gguf" if (package_dir / "model.gguf").exists() else "hf_model"))
     config: Dict[str, Any] = {
         "schema_version": "1.0",
         "package_name": package_name,
         "created_by": "edgeai task system",
         "platform": {"system": platform.system(), "machine": platform.machine()},
-        "runtime": "onnxruntime",
+        "runtime": runtime_name,
         "task_type": final_task,
         "task_title": guidance["title"],
         "inferred_task_type": inferred,
         "inference_reasons": reasons,
-        "model_path": "model.onnx",
+        "model_path": model_path_value,
         "input": {"type": guidance["input_type"], "prompt": guidance["input_prompt"], "name": model_input.get("name", "input"), "shape": input_shape, "dtype": model_input.get("dtype"), "layout": model_input.get("layout_guess") or ("NCHW" if len(input_shape) == 4 and input_shape[1] in (1, 3) else "unknown")},
         "output": {"type": guidance["result_type"], "name": model_output.get("name", "output"), "shape": output_shape, "dtype": model_output.get("dtype"), "class_count": class_count, "label_map": label_map_value, "label_language": label_language},
         "ui": {"input_prompt": guidance["input_prompt"], "recommended_examples": guidance.get("recommended_examples", []), "result_view": guidance["result_type"]},

@@ -117,6 +117,12 @@ def _summary_for(task_type: str, topk: List[Dict[str, Any]], local_result: Dict[
         }
     if task_type == "segmentation":
         return {"title": "图像分割结果", "primary": "已生成分割输出，请查看可视化产物。", "confidence": None}
+    if task_type == "llm_chat":
+        response = local_result.get("response")
+        if not response and isinstance(local_result.get("outputs"), list) and local_result["outputs"]:
+            first = local_result["outputs"][0]
+            response = first.get("text") if isinstance(first, dict) else None
+        return {"title": "Local LLM Chat Result", "primary": str(response or "Chat output generated.")[:220], "confidence": None}
     if task_type in {"text_classification", "llm_chat"}:
         return {"title": "文本/对话推理结果", "primary": "已生成文本推理输出。", "confidence": None}
     return {"title": "通用推理结果", "primary": "已生成本地推理输出。", "confidence": best.get("score")}
@@ -151,6 +157,7 @@ def render_task_result(package: str | Path, force: bool = False) -> Dict[str, An
         "report_md": "report.md" if (package_dir / "report.md").exists() else None,
         "report_pdf": "report.pdf" if (package_dir / "report.pdf").exists() else None,
         "raw_output": "local_output.npy" if (package_dir / "local_output.npy").exists() else None,
+        "text_output": "local_output.txt" if (package_dir / "local_output.txt").exists() else None,
     }
 
     result: Dict[str, Any] = {
@@ -174,6 +181,12 @@ def render_task_result(package: str | Path, force: bool = False) -> Dict[str, An
             "output_count": len(local.get("outputs") or []) if isinstance(local.get("outputs"), list) else None,
         },
     }
+    if task_type == "llm_chat":
+        input_obj = local.get("input") if isinstance(local.get("input"), dict) else {}
+        result["conversation"] = {
+            "prompt": input_obj.get("text"),
+            "response": local.get("response"),
+        }
 
     _write_json(out_path, result)
     return result

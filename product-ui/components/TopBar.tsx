@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 import type { ModelItem } from "@/lib/types";
 
 const FILE_INPUT_ID = "workspace-onnx-upload-input";
+const MODEL_EXTENSIONS = [
+  ".onnx", ".pt", ".pth", ".ckpt", ".h5", ".hdf5", ".keras", ".pb", ".tflite",
+  ".pkl", ".joblib", ".sav", ".bst", ".xgb", ".lgb", ".gguf", ".txt", ".json", ".zip",
+];
 
 export function TopBar({
   selectedModel,
@@ -78,7 +82,8 @@ export function TopBar({
 
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith(".onnx")) {
+    const lower = file.name.toLowerCase();
+    if (!MODEL_EXTENSIONS.some((ext) => lower.endsWith(ext))) {
       window.alert("请选择 .onnx 模型文件");
       return;
     }
@@ -123,13 +128,13 @@ export function TopBar({
             disabled={disabled}
             onClick={openFilePicker}
           >
-            {busy === "import" ? "Uploading..." : "Import ONNX"}
+            {busy === "import" ? "Uploading..." : "Import Model"}
           </button>
 
           <input
             id={FILE_INPUT_ID}
             type="file"
-            accept=".onnx"
+            accept={MODEL_EXTENSIONS.join(",")}
             style={{ display: "none" }}
             onChange={handleFileChange}
           />

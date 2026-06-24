@@ -11,6 +11,8 @@ PYTHON_BIN="${PYTHON_BIN:-python3}"
 VENV_DIR="${VENV_DIR:-"$ROOT/.venv"}"
 WITH_TENSORFLOW=0
 WITH_PYTORCH=0
+WITH_ML=0
+WITH_LLM=0
 WITH_FRONTEND=1
 
 usage() {
@@ -20,6 +22,8 @@ Usage: scripts/install-linux.sh [options]
 Options:
   --with-pytorch       Install PyTorch conversion dependencies.
   --with-tensorflow     Install TensorFlow/Keras conversion dependencies.
+  --with-ml             Install sklearn/xgboost/lightgbm conversion dependencies.
+  --with-llm            Install llama-cpp-python for GGUF chat inference.
   --no-frontend         Skip pnpm/Corepack frontend dependency install.
   --python PATH         Python executable to use. Default: python3.
   --venv PATH           Virtualenv directory. Default: .venv.
@@ -35,6 +39,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --with-pytorch)
       WITH_PYTORCH=1
+      shift
+      ;;
+    --with-ml)
+      WITH_ML=1
+      shift
+      ;;
+    --with-llm)
+      WITH_LLM=1
       shift
       ;;
     --no-frontend)
@@ -90,6 +102,18 @@ if [ "$WITH_TENSORFLOW" -eq 1 ]; then
   python -m pip install tensorflow-cpu tf2onnx h5py
 else
   echo "[EdgeAI] TensorFlow conversion deps skipped. Use --with-tensorflow to enable .h5/.keras/SavedModel conversion."
+fi
+
+if [ "$WITH_ML" -eq 1 ]; then
+  python -m pip install ".[traditional-ml]"
+else
+  echo "[EdgeAI] Traditional ML deps skipped. Use --with-ml to enable sklearn/xgboost/lightgbm conversion."
+fi
+
+if [ "$WITH_LLM" -eq 1 ]; then
+  python -m pip install ".[llm]"
+else
+  echo "[EdgeAI] LLM runtime deps skipped. Use --with-llm or install llama.cpp to enable GGUF chat."
 fi
 
 if [ "$WITH_FRONTEND" -eq 1 ]; then

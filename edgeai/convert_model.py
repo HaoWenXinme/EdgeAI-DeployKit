@@ -46,6 +46,8 @@ SUPPORTED_FRAMEWORKS = {
     "sklearn",
     "xgboost",
     "lightgbm",
+    "llm",
+    "gguf",
 }
 
 TORCHVISION_ARCH_CANDIDATES = [
@@ -98,7 +100,7 @@ def sanitize_name(value: str | None, fallback: str = "user_model") -> str:
     import re
 
     raw = (value or fallback).strip().replace("\\", "/").split("/")[-1]
-    raw = re.sub(r"\.(onnx|pt|pth|pkl|joblib|h5|hdf5|keras|pb|tflite|ckpt|sav|bst|xgb|lgb|txt)$", "", raw, flags=re.I)
+    raw = re.sub(r"\.(onnx|pt|pth|pkl|joblib|h5|hdf5|keras|pb|tflite|ckpt|sav|bst|xgb|lgb|gguf|txt|zip)$", "", raw, flags=re.I)
     raw = re.sub(r"[^A-Za-z0-9_.-]+", "_", raw).strip("._-")
     return raw or fallback
 
@@ -112,6 +114,7 @@ def infer_framework(source: Path, requested: str | None) -> str:
         "keras": "tensorflow",
         "pb": "tensorflow",
         "tflite": "tensorflow",
+        "gguf": "llm",
     }
     if requested != "auto":
         if requested not in SUPPORTED_FRAMEWORKS:
@@ -121,6 +124,13 @@ def infer_framework(source: Path, requested: str | None) -> str:
     if source.is_dir():
         if (source / "saved_model.pb").exists():
             return "tensorflow"
+        if (source / "config.json").exists() and (
+            (source / "tokenizer.json").exists()
+            or (source / "tokenizer.model").exists()
+            or list(source.glob("*.safetensors"))
+            or list(source.glob("*.gguf"))
+        ):
+            return "llm"
         return "tensorflow"
 
     suffix = source.suffix.lower()
@@ -140,6 +150,8 @@ def infer_framework(source: Path, requested: str | None) -> str:
         return "xgboost"
     if suffix == ".txt":
         return "lightgbm"
+    if suffix in {".gguf", ".safetensors"}:
+        return "llm"
     return "onnx"
 
 
@@ -557,6 +569,14 @@ def inspect_conversion_requirements(
             suggested["feature_count"] = 4
             questions.append(_question("feature_count", "特征数量", f"{resolved} 转 ONNX 需要输入特征数。", 4))
 
+    elif resolved == "llm":
+        has_gguf = source.suffix.lower() == ".gguf" or (source.is_dir() and bool(list(source.rglob("*.gguf"))))
+        detected_source_kind = "llm_gguf" if has_gguf else "llm_directory"
+        suggested["task_type"] = "llm_chat"
+        suggested["runtime"] = "llama.cpp" if has_gguf else "external"
+        if not has_gguf:
+            warnings.append("HuggingFace-style LLM directories are packaged, but chat inference needs an external runtime adapter.")
+
     ready = not missing and not install_commands
     return {
         "ready": ready,
@@ -794,6 +814,85 @@ def convert_booster(framework: str, source: Path, output_onnx: Path, input_shape
     output_onnx.write_bytes(onnx_model.SerializeToString())
 
 
+def convert_llm_package(source: Path, package_dir: Path, warnings: list[str]) -> Path:
+    """Create a package for local LLM runtimes.
+
+    GGUF can run with llama.cpp or llama-cpp-python. HuggingFace-style directories
+    are recorded as deployable model sources, but need a runtime such as Ollama,
+    transformers, or a later ONNX GenAI export path.
+    """
+    package_dir.mkdir(parents=True, exist_ok=True)
+    source_model_dir = package_dir / "source_model"
+    source_model_dir.mkdir(parents=True, exist_ok=True)
+
+    model_path: Path
+    if source.is_file() and source.suffix.lower() == ".gguf":
+        model_path = package_dir / "model.gguf"
+        shutil.copy2(source, model_path)
+        runtime = "llama.cpp"
+        runnable = True
+    elif source.is_dir():
+        ggufs = sorted(source.rglob("*.gguf"))
+        if ggufs:
+            model_path = package_dir / "model.gguf"
+            shutil.copy2(ggufs[0], model_path)
+            runtime = "llama.cpp"
+            runnable = True
+        else:
+            target = package_dir / "hf_model"
+            if target.exists():
+                shutil.rmtree(target)
+            shutil.copytree(source, target)
+            model_path = target
+            runtime = "external"
+            runnable = False
+            warnings.append("HuggingFace directory package created; install/configure a local runtime before chat inference.")
+    else:
+        raise RuntimeError(f"unsupported LLM source: {source}; provide .gguf or a HuggingFace model directory")
+
+    signature = {
+        "model_path": str(model_path),
+        "format": "gguf" if model_path.suffix.lower() == ".gguf" else "huggingface_directory",
+        "inputs": [{"name": "prompt", "shape": ["text"], "dtype": "string", "dynamic": True, "layout_guess": "text"}],
+        "outputs": [{"name": "response", "shape": ["text"], "dtype": "string", "dynamic": True, "layout_guess": "text"}],
+        "runtime": runtime,
+        "has_dynamic_shape": True,
+    }
+    operator_report = {
+        "model_path": str(model_path),
+        "node_count": None,
+        "operator_count": {},
+        "runtime": runtime,
+        "note": "LLM packages are executed by a text-generation runtime, not ONNX graph operators.",
+    }
+    model_json = {
+        "model_name": package_dir.name,
+        "framework": "llm",
+        "source_model": str(source),
+        "copied_source": str(model_path),
+        "runtime": runtime,
+        "runnable": runnable,
+        "model_path": model_path.name if model_path.is_file() else model_path.name,
+        "stage": "convert",
+    }
+    llm_runtime = {
+        "runtime": runtime,
+        "model_path": model_path.name if model_path.is_file() else model_path.name,
+        "provider_order": ["llama_cpp_python", "llama_cpp_cli", "ollama_external"],
+        "default_max_tokens": 256,
+        "default_temperature": 0.7,
+        "runnable": runnable,
+    }
+    for name, data in {
+        "model_signature.json": signature,
+        "operator_report.json": operator_report,
+        "model.json": model_json,
+        "llm_runtime.json": llm_runtime,
+    }.items():
+        (package_dir / name).write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return model_path
+
+
 def write_compatibility_report(package_dir: Path, result: ConvertStatus) -> Path:
     path = package_dir / "compatibility_report.md"
     lines = [
@@ -980,6 +1079,9 @@ def convert_model(
         elif resolved_framework in {"xgboost", "lightgbm"}:
             convert_booster(resolved_framework, source, output_onnx, input_shape, input_name, feature_count=feature_count)
             validate_onnx(output_onnx, warnings)
+        elif resolved_framework == "llm":
+            llm_model = convert_llm_package(source, package_dir, warnings)
+            output_onnx = llm_model
         else:
             raise RuntimeError(f"framework not implemented: {resolved_framework}")
 
@@ -991,13 +1093,13 @@ def convert_model(
             package_dir=str(package_dir),
             output_onnx=str(output_onnx),
             opset=opset,
-            message="model converted/imported to ONNX package successfully",
+            message="model converted/imported to package successfully" if resolved_framework == "llm" else "model converted/imported to ONNX package successfully",
             warnings=warnings,
             next_steps=[
-                f"edgeai analyze --package {package_dir}",
-                f"edgeai prepare-input --package {package_dir} --input <your_input_image_or_npy>",
-                f"edgeai local-run --package {package_dir}",
-                f"edgeai report --package {package_dir}",
+                f"edgeai task-init --package {package_dir} --task-type llm_chat" if resolved_framework == "llm" else f"edgeai analyze --package {package_dir}",
+                f"edgeai local-run --package {package_dir} --prompt <your_prompt>" if resolved_framework == "llm" else f"edgeai prepare-input --package {package_dir} --input <your_input_image_or_npy>",
+                f"edgeai report --package {package_dir}" if resolved_framework == "llm" else f"edgeai local-run --package {package_dir}",
+                f"edgeai report --package {package_dir}" if resolved_framework != "llm" else "Open the WebUI chat panel for package-local conversation.",
             ],
             suggested_params={
                 "framework": resolved_framework,
@@ -1093,4 +1195,3 @@ def convert_tensorflow(
         pass
 # === EdgeAI TensorFlow Universal Importer v1b override END ===
 # === EdgeAI TensorFlow Universal Importer v1b override END ===
-

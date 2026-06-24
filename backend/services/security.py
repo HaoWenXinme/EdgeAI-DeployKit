@@ -91,6 +91,9 @@ FLAG_MAP = {
     "task_type": "--task-type",
     "label_map": "--label-map",
     "label_language": "--label-language",
+    "prompt": "--prompt",
+    "max_tokens": "--max-tokens",
+    "temperature": "--temperature",
 }
 
 EDGEAI_MODULE_COMMAND = [sys.executable, "-m", "edgeai.cli"]
@@ -134,6 +137,11 @@ def safe_filename(filename: str) -> str:
     cleaned = "".join(allowed).strip("._")
     if not cleaned:
         raise HTTPException(status_code=400, detail="invalid filename")
+    return cleaned
+
+
+def safe_package_name(name: str) -> str:
+    cleaned = safe_filename((name or "").replace("\\", "/").split("/")[-1])
     return cleaned
 
 
