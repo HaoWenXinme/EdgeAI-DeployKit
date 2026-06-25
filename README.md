@@ -12,15 +12,15 @@ result, and export a report.
 
 Latest preview release:
 
-[v0.2.0-local-preview](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/tag/v0.2.0-local-preview)
+[v0.2.0-local-preview](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/tag/v0.2.0-local-preview)
 
 | Platform | Package | Notes |
 | --- | --- | --- |
-| Windows x86_64 | [EdgeAI-DeployKit-windows-x86_64.zip](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-windows-x86_64.zip) | Double-click `start-windows.bat`. If Python is missing, run `install-runtime-windows.bat`. |
-| macOS Apple Silicon | [EdgeAI-DeployKit-macos-arm64.tar.gz](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-macos-arm64.tar.gz) | For M1/M2/M3/M4 Macs. |
-| macOS Intel | [EdgeAI-DeployKit-macos-x86_64.tar.gz](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-macos-x86_64.tar.gz) | For Intel Macs. |
-| Linux x86_64 | [EdgeAI-DeployKit-linux-x86_64.tar.gz](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-linux-x86_64.tar.gz) | Validated first on openEuler/Linux local inference flow. |
-| Linux arm64 | [EdgeAI-DeployKit-linux-arm64.tar.gz](https://github.com/3822034017-coder/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-linux-arm64.tar.gz) | For ARM64 Linux VM/device validation. |
+| Windows x86_64 | [EdgeAI-DeployKit-windows-x86_64.zip](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-windows-x86_64.zip) | Double-click `start-windows.bat`. If Python is missing, run `install-runtime-windows.bat`. |
+| macOS Apple Silicon | [EdgeAI-DeployKit-macos-arm64.tar.gz](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-macos-arm64.tar.gz) | For M1/M2/M3/M4 Macs. |
+| macOS Intel | [EdgeAI-DeployKit-macos-x86_64.tar.gz](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-macos-x86_64.tar.gz) | For Intel Macs. |
+| Linux x86_64 | [EdgeAI-DeployKit-linux-x86_64.tar.gz](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-linux-x86_64.tar.gz) | Validated first on openEuler/Linux local inference flow. |
+| Linux arm64 | [EdgeAI-DeployKit-linux-arm64.tar.gz](https://github.com/HaoWenXinme/EdgeAI-DeployKit/releases/download/v0.2.0-local-preview/EdgeAI-DeployKit-linux-arm64.tar.gz) | For ARM64 Linux VM/device validation. |
 
 ## What It Does
 
