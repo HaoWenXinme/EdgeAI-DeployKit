@@ -85,7 +85,15 @@ def _run_with_llama_cli(model_path: Path, prompt: str, max_tokens: int, temperat
         "--simple-io",
         "--no-display-prompt",
     ]
-    proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
+    proc = subprocess.run(
+        cmd,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=600,
+    )
     if proc.returncode != 0:
         raise RuntimeError(proc.stdout[-4000:])
     return _clean_llama_cli_output(proc.stdout or "", prompt), "llama-cli"

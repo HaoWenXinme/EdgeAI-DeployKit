@@ -228,6 +228,9 @@ export type LocalInferenceFlowRequest = {
   package_name: string;
   input?: string;
   input_path?: string;
+  prompt?: string;
+  max_tokens?: number;
+  temperature?: number;
   force_report?: boolean;
   force_analyze?: boolean;
   force_task?: boolean;

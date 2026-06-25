@@ -88,11 +88,13 @@ function inferFramework(pathOrName: string): Framework {
 function writeLocalSession(packageName: string, sourceModel: string) {
   if (typeof window === "undefined") return;
   const now = Date.now();
+  const isLlm = sourceModel.toLowerCase().endsWith(".gguf") || sourceModel.toLowerCase().includes("gguf");
   const session = {
     mode: "local",
     status: "converted",
     sourceModel,
-    modelPath: `outputs/packages/${packageName}/model.onnx`,
+    modelPath: `outputs/packages/${packageName}/${isLlm ? "model.gguf" : "model.onnx"}`,
+    taskType: isLlm ? "llm_chat" : "auto",
     packageName,
     updatedAt: now,
   };

@@ -15,6 +15,7 @@ import { DeployModeDialog, DeployModeSwitch, type DeployMode } from "@/component
 import { FeatureLaunchGrid } from "@/components/FeatureLaunchGrid";
 import { InferResultPanel } from "@/components/InferResultPanel";
 import { LocalInferencePanel } from "@/components/LocalInferencePanel";
+import { LocalLlmChatPanel } from "@/components/LocalLlmChatPanel";
 import { ModelRegistry } from "@/components/ModelRegistry";
 import { ModelProductPanel } from "@/components/ModelProductPanel";
 import { ProductOverviewV1 } from "@/components/ProductOverviewV1";
@@ -141,6 +142,18 @@ function readActiveLocalPackage() {
     if (found) return found;
   }
   return "";
+}
+
+function readActiveLocalSessionText() {
+  if (typeof window === "undefined") return "";
+  const values: string[] = [];
+  for (const key of ACTIVE_LOCAL_KEYS) {
+    const raw = window.localStorage.getItem(key);
+    if (raw) values.push(raw);
+  }
+  const current = window.localStorage.getItem(ACTIVE_RUN_KEY);
+  if (current) values.push(current);
+  return values.join(" ").toLowerCase();
 }
 
 function writeDeployMode(mode: DeployMode) {
@@ -350,6 +363,11 @@ export default function WorkspacePage() {
     return currentPackageName || displayPackageName(selectedModel);
   }
 
+  function selectedPackageIsLlm() {
+    const value = `${selectedPackageName()} ${selectedModel?.name || ""} ${selectedModel?.path || ""} ${readActiveLocalSessionText()}`.toLowerCase();
+    return value.includes("gguf") || value.includes("llm") || value.includes("chat") || value.includes("tinyllama") || value.includes("qwen") || value.includes("deepseek");
+  }
+
   function packageDir() {
     return `outputs/packages/${selectedPackageName()}`;
   }
@@ -523,14 +541,22 @@ export default function WorkspacePage() {
             {pipelineSessionReady && deployMode === "local" ? (
               <>
                 <TaskGuidancePanel packageName={selectedPackageName()} />
-                <LocalInferencePanel
-                  packageName={selectedPackageName()}
-                  selectedInputPath={selectedInputPath}
-                  onUploadInput={importInputImage}
-                  onRefresh={refresh}
-                  onOpenRuntime={() => setActivePanel("runtime")}
-                  onOpenReports={() => setActivePanel("reports")}
-                />
+                {selectedPackageIsLlm() ? (
+                  <LocalLlmChatPanel
+                    packageName={selectedPackageName()}
+                    onRefresh={refresh}
+                    onOpenReports={() => setActivePanel("reports")}
+                  />
+                ) : (
+                  <LocalInferencePanel
+                    packageName={selectedPackageName()}
+                    selectedInputPath={selectedInputPath}
+                    onUploadInput={importInputImage}
+                    onRefresh={refresh}
+                    onOpenRuntime={() => setActivePanel("runtime")}
+                    onOpenReports={() => setActivePanel("reports")}
+                  />
+                )}
                 <TaskResultPanel packageName={selectedPackageName()} />
               </>
             ) : null}
@@ -591,14 +617,22 @@ export default function WorkspacePage() {
             ) : deployMode === "local" ? (
               <>
                 <TaskGuidancePanel packageName={selectedPackageName()} compact />
-                <LocalInferencePanel
-                  packageName={selectedPackageName()}
-                  selectedInputPath={selectedInputPath}
-                  onUploadInput={importInputImage}
-                  onRefresh={refresh}
-                  onOpenRuntime={() => setActivePanel("runtime")}
-                  onOpenReports={() => setActivePanel("reports")}
-                />
+                {selectedPackageIsLlm() ? (
+                  <LocalLlmChatPanel
+                    packageName={selectedPackageName()}
+                    onRefresh={refresh}
+                    onOpenReports={() => setActivePanel("reports")}
+                  />
+                ) : (
+                  <LocalInferencePanel
+                    packageName={selectedPackageName()}
+                    selectedInputPath={selectedInputPath}
+                    onUploadInput={importInputImage}
+                    onRefresh={refresh}
+                    onOpenRuntime={() => setActivePanel("runtime")}
+                    onOpenReports={() => setActivePanel("reports")}
+                  />
+                )}
                 <TaskResultPanel packageName={selectedPackageName()} />
               </>
             ) : (

@@ -1372,6 +1372,8 @@ def local_inference_flow(payload: dict):
 
     input_value = payload.get("input") or payload.get("input_path")
     llm_prompt = str(payload.get("prompt") or input_value or "").strip() if is_llm else None
+    llm_max_tokens = int(payload.get("max_tokens") or 256) if is_llm else None
+    llm_temperature = float(payload.get("temperature") if payload.get("temperature") is not None else 0.7) if is_llm else None
     input_path = None if is_llm else (resolve_project_file(input_value) if input_value else None)
     stages: list[dict] = []
 
@@ -1419,7 +1421,7 @@ def local_inference_flow(payload: dict):
 
     from edgeai.local_runner import run_local_package
 
-    if not append_python_or_fail("local-run", run_local_package, package_dir, prompt=llm_prompt):
+    if not append_python_or_fail("local-run", run_local_package, package_dir, prompt=llm_prompt, max_tokens=llm_max_tokens, temperature=llm_temperature):
         return {"ok": False, "message": "Local run failed", "package_name": package_name, "package_dir": str(package_dir), "input": input_path, "stages": stages}
 
     # Task render is optional in older installs, but this project should have it. Fail clearly if it breaks.

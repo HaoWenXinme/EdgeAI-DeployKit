@@ -49,11 +49,18 @@ def _topk(arr: np.ndarray, labels: Dict[int, str], k: int = 5) -> Optional[List[
     ]
 
 
-def run_local_package(package_dir: Path, repeat: int = 1, warmup: int = 1, prompt: str | None = None) -> Dict[str, Any]:
+def run_local_package(
+    package_dir: Path,
+    repeat: int = 1,
+    warmup: int = 1,
+    prompt: str | None = None,
+    max_tokens: int | None = None,
+    temperature: float | None = None,
+) -> Dict[str, Any]:
     from .llm_runner import is_llm_package, run_llm_package
 
     if is_llm_package(package_dir):
-        return run_llm_package(package_dir, prompt=prompt)
+        return run_llm_package(package_dir, prompt=prompt, max_tokens=max_tokens, temperature=temperature)
 
     try:
         import onnxruntime as ort
