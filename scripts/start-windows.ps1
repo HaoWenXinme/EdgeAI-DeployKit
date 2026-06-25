@@ -104,6 +104,86 @@ function Ensure-NodeRuntime {
   }
 }
 
+function Find-LlamaCliRuntime {
+  $envCli = $env:EDGEAI_LLAMA_CLI
+  if ($envCli -and (Test-Path $envCli)) {
+    return (Resolve-Path $envCli).Path
+  }
+  $localCli = Get-ChildItem -Path (Join-Path $RuntimeDir "llama.cpp") -Recurse -Filter "llama-cli.exe" -ErrorAction SilentlyContinue |
+    Select-Object -First 1
+  if ($localCli) {
+    return $localCli.FullName
+  }
+  $pathCli = Get-Command llama-cli -ErrorAction SilentlyContinue
+  if ($pathCli) {
+    return $pathCli.Source
+  }
+  $pathLegacy = Get-Command llama -ErrorAction SilentlyContinue
+  if ($pathLegacy) {
+    return $pathLegacy.Source
+  }
+  return $null
+}
+
+function Install-LlamaCppRuntime {
+  if ($NoInstall) {
+    return
+  }
+  $llamaRoot = Join-Path $RuntimeDir "llama.cpp"
+  $llamaBin = Join-Path $llamaRoot "bin"
+  $llamaCli = Join-Path $llamaBin "llama-cli.exe"
+  if (Test-Path $llamaCli) {
+    $env:EDGEAI_LLAMA_CLI = $llamaCli
+    Add-PathDir $llamaBin
+    return
+  }
+
+  $tag = if ($env:EDGEAI_LLAMA_CPP_TAG) { $env:EDGEAI_LLAMA_CPP_TAG } else { "b9787" }
+  $asset = "llama-$tag-bin-win-cpu-x64.zip"
+  $url = if ($env:EDGEAI_LLAMA_CPP_URL) { $env:EDGEAI_LLAMA_CPP_URL } else { "https://github.com/ggml-org/llama.cpp/releases/download/$tag/$asset" }
+  $zipPath = Join-Path $llamaRoot $asset
+  New-Item -ItemType Directory -Force -Path $llamaRoot, $llamaBin | Out-Null
+  Write-Host "[EdgeAI] GGUF runtime not found. Downloading llama.cpp CPU runtime..."
+  Write-Host "[EdgeAI] URL: $url"
+  try {
+    Invoke-WebRequest -Uri $url -OutFile $zipPath -UseBasicParsing
+    Expand-Archive -Path $zipPath -DestinationPath $llamaBin -Force
+  } catch {
+    throw @"
+GGUF runtime could not be downloaded.
+
+Install llama.cpp manually and set EDGEAI_LLAMA_CLI to llama-cli.exe, or set EDGEAI_LLAMA_CPP_URL to a reachable zip mirror.
+Original error: $($_.Exception.Message)
+"@
+  } finally {
+    Remove-Item $zipPath -Force -ErrorAction SilentlyContinue
+  }
+
+  $found = Find-LlamaCliRuntime
+  if (-not $found) {
+    throw "llama.cpp extraction finished but llama-cli.exe was not found under $llamaRoot"
+  }
+  $env:EDGEAI_LLAMA_CLI = $found
+  Add-PathDir (Split-Path -Parent $found)
+}
+
+function Ensure-LlamaRuntime {
+  $found = Find-LlamaCliRuntime
+  if (-not $found) {
+    Install-LlamaCppRuntime
+    $found = Find-LlamaCliRuntime
+  }
+  if ($found) {
+    $env:EDGEAI_LLAMA_CLI = $found
+    Add-PathDir (Split-Path -Parent $found)
+    Write-Host "[EdgeAI] GGUF runtime: $found"
+  } elseif ($WithLLM) {
+    throw "GGUF runtime was requested but llama-cli.exe was not found."
+  } else {
+    Write-Host "[EdgeAI] GGUF runtime not configured. Use -WithLLM to enable local GGUF chat."
+  }
+}
+
 function Find-Python {
   if ($env:PYTHON_BIN) {
     return @{ Exe = $env:PYTHON_BIN; Args = @() }
@@ -239,10 +319,9 @@ if (-not $NoInstall -and -not (Test-Path $InstallMarker)) {
   }
 
   if ($WithLLM) {
-    & $VenvPython -m pip install ".[llm]"
-    if ($LASTEXITCODE -ne 0) { throw "LLM runtime dependency install failed." }
+    Ensure-LlamaRuntime
   } else {
-    Write-Host "[EdgeAI] LLM runtime deps skipped. Use -WithLLM or install llama.cpp to enable GGUF chat."
+    Ensure-LlamaRuntime
   }
 
   if (-not $NoFrontendInstall) {
@@ -263,6 +342,7 @@ if (-not (Test-Path $VenvPython)) {
 }
 
 Ensure-NodeRuntime
+Ensure-LlamaRuntime
 
 $ApiPort = Get-FreePort $ApiPort
 $UiPort = Get-FreePort $UiPort

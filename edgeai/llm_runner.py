@@ -81,11 +81,45 @@ def _run_with_llama_cli(model_path: Path, prompt: str, max_tokens: int, temperat
         str(max_tokens),
         "--temp",
         str(temperature),
+        "--single-turn",
+        "--simple-io",
+        "--no-display-prompt",
     ]
     proc = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=600)
     if proc.returncode != 0:
         raise RuntimeError(proc.stdout[-4000:])
-    return (proc.stdout or "").strip(), "llama-cli"
+    return _clean_llama_cli_output(proc.stdout or "", prompt), "llama-cli"
+
+
+def _clean_llama_cli_output(output: str, prompt: str) -> str:
+    """Remove llama.cpp chat banner/prompt noise from single-turn CLI output."""
+    text = output.replace("\r\n", "\n").strip()
+    prompt_markers = [f"> {prompt}", prompt]
+    for marker in prompt_markers:
+        idx = text.rfind(marker)
+        if idx >= 0:
+            text = text[idx + len(marker):]
+            break
+    lines: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if lines:
+                lines.append("")
+            continue
+        if stripped.startswith("[ Prompt:") or stripped == "Exiting...":
+            break
+        if stripped.startswith(">"):
+            continue
+        if stripped.startswith("Loading model") or stripped.startswith("build      :") or stripped.startswith("model      :") or stripped.startswith("modalities :"):
+            continue
+        if stripped.startswith("available commands:") or stripped.startswith("/exit") or stripped.startswith("/regen") or stripped.startswith("/clear") or stripped.startswith("/read") or stripped.startswith("/glob"):
+            continue
+        if "▄▄" in stripped or "██" in stripped or "▀▀" in stripped or "████" in stripped:
+            continue
+        lines.append(line)
+    cleaned = "\n".join(lines).strip()
+    return cleaned or text
 
 
 def run_llm_package(
@@ -135,4 +169,3 @@ def run_llm_package(
     _write_json(package / "local_result.json", result)
     (package / "local_output.txt").write_text(response + "\n", encoding="utf-8")
     return result
-
